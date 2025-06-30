@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>震央推定ゲーム</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            margin: 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .game-area {
+            padding: 20px;
+        }
+        
+        .difficulty-selection {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .difficulty-btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 25px;
+            margin: 5px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+        }
+        
+        .difficulty-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+        }
+        
+        .game-controls {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .control-btn {
+            background: linear-gradient(45deg, #2196F3, #1976D2);
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        }
+        
+        .control-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .control-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .canvas-container {
+            display: flex;
+            justify-content: center;
+            margin: 20px 0;
+        }
+        
+        canvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+            cursor: crosshair;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+        
+        .game-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+        }
+        
+        .score-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #e74c3c;
+        }
+        
+        .round-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 5px;
+            font-size: 14px;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+        
+        .results {
+            text-align: center;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 5px solid #e74c3c;
+        }
+        
+        .final-results {
+            text-align: center;
+            padding: 30px;
+            background: linear-gradient(45deg, #ffd700, #ffed4a);
+            border-radius: 15px;
+            margin: 20px 0;
+            box-shadow: 0 5px 20px rgba(255,215,0,0.3);
+        }
+        
+        .confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 9999;
+        }
+        
+        .particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 10000;
+        }
+        
+        @keyframes fall {
+            0% { 
+                transform: translateY(-100vh) translateX(var(--initial-x, 0)) rotate(0deg); 
+                opacity: 1;
+            }
+            100% { 
+                transform: translateY(100vh) translateX(calc(var(--initial-x, 0) + var(--drift-x, 0))) rotate(360deg); 
+                opacity: 0;
+            }
+        }
+        
+        .confetti-piece {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #ff6b6b;
+            animation: fall 3s linear infinite;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .instructions {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 4px solid #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌏 震央推定ゲーム 🌏</h1>
+        </div>
+        
+        <div class="game-area">
+            <div id="difficulty-screen">
+                <div class="instructions">
+                    <h3>ゲーム説明</h3>
+                    <p>
+                        このゲームは、地震観測点におけるP波の到達時間データを活用し、地震の震央を推定することを目的としたシミュレーションゲームです。プレイヤーは、地震学者が実際の観測データから震源を特定するプロセスを疑似体験できます。
+                    </p>
+                    <p>
+                        <h4>基本的な進め方</h4>
+                        <ol>
+                            <li>
+                                観測データの収集: マップ上にランダムに配置された複数の地震観測点が表示されます。各観測点にマウスカーソルを合わせると、地震が発生してから、その観測点にP波が到達するまでの時間が表示されます。P波の到達時間は、震源からの距離に比例するため、この情報が震源推定の重要な手がかりとなります。
+                            </li>
+                            <li>
+                                震央の推定: 取得したP波到達時間に基づいて、あなたが震央だと推測したマップ上の地点をクリックして、決定してください。
+                            </li>
+                            <li>
+                                結果発表: 震央を決定した後、「結果を見る」ボタンを押すと、真の震央がマップ上に表示され、あなたの推定との誤差（km）が示されます。この誤差に応じてスコアが算出され、あなたの推定の精度が評価されます。
+                            </li>
+                        </ol>
+                    </p>
+                    <p>
+                        <h4>ヒント機能の活用</h4>
+                        ゲームには、震央推定を補助する「ヒント」機能が用意されています。
+                        <ul>
+                            <li>
+                                「ヒント」ボタンをクリックすると、各観測点から同心円状の波紋が6km/sで広がっていくアニメーションが表示されます。この波紋が全て重なる交点が震央の大まかな位置になります。悩んだときは活用してみましょう！
+                            </li>
+                        </ul>
+                    </p>
+                    <p>
+                        <h4>合計スコアの発表</h4>
+                        ゲームは複数ラウンドで構成されており、各ラウンドで震央を推定し、スコアを獲得します。最終ラウンド終了後には合計スコアが表示され、あなたの推定スキルに応じた評価が与えられます。高スコアを目指して頑張りましょう！
+                    </p>
+                </div>
+                <div class="difficulty-selection">
+                    <h2>難易度を選択してください</h2>
+                    <button class="difficulty-btn" onclick="selectDifficulty(5)">レベル1 (観測点5)</button>
+                    <button class="difficulty-btn" onclick="selectDifficulty(3)">レベル2 (観測点3)</button>
+                    <button class="difficulty-btn" onclick="selectDifficulty(2)">レベル3 (観測点2)</button>
+                </div>
+            </div>
+            
+            <div id="game-screen" class="hidden">
+                <div class="game-info">
+                    <div class="round-display">ラウンド: <span id="current-round">1</span>/5</div>
+                    <div class="score-display">スコア: <span id="current-score">0</span></div>
+                </div>
+                
+                <div class="game-controls">
+                    <button id="hint-btn" class="control-btn" onclick="activateHint()">ヒント</button>
+                    <button id="submit-btn" class="control-btn" onclick="submitEstimate()" disabled>結果をみる</button>
+                    <button id="next-btn" class="control-btn hidden" onclick="nextRound()">次のラウンド</button>
+                </div>
+                
+                <div class="canvas-container">
+                    <canvas id="game-canvas" width="800" height="600"></canvas>
+                </div>
+                
+                <div id="results" class="results hidden"></div>
+            </div>
+            
+            <div id="final-screen" class="hidden">
+                <div class="final-results">
+                    <h2>ゲーム終了！</h2>
+                    <div id="final-score"></div>
+                    <div id="final-message"></div>
+                    <button class="difficulty-btn" onclick="restartGame()">もう一度プレイ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="tooltip" class="tooltip hidden"></div>
+    <div id="confetti" class="confetti hidden"></div>
+    <canvas id="particle-canvas" class="particle-canvas hidden"></canvas>
+    
+    <script>
+        // Game state variables
+        let gameState = {
+            difficulty: 0,
+            round: 1,
+            totalScore: 0,
+            currentRoundScore: 0,
+            stations: [],
+            trueEpicenter: null,
+            userEstimate: null,
+            mapScale: 1, // km per pixel
+            hintActive: false,
+            submitted: false
+        };
+        
+        // Canvas and context
+        let canvas = document.getElementById('game-canvas');
+        let ctx = canvas.getContext('2d');
+        
+        // Terrain data
+        let terrainData = null;
+        
+        // Animation variables
+        let animationId = null;
+        let hintStartTime = null;
+        
+        // Game initialization
+        function selectDifficulty(stations) {
+            gameState.difficulty = stations;
+            document.getElementById('difficulty-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            startNewRound();
+        }
+        
+        function startNewRound() {
+            // Reset round state
+            gameState.hintActive = false;
+            gameState.submitted = false;
+            gameState.userEstimate = null;
+            
+            // Cancel any ongoing hint animation
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+            hintStartTime = null;
+            
+            // Update UI
+            document.getElementById('current-round').textContent = gameState.round;
+            document.getElementById('current-score').textContent = gameState.totalScore;
+            document.getElementById('hint-btn').disabled = false;
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('next-btn').classList.add('hidden');
+            document.getElementById('results').classList.add('hidden');
+            
+            // Generate terrain and game elements
+            generateTerrain();
+            placeEpicenterAndStations();
+            drawMap();
+        }
+        
+        // Terrain generation using diamond-square algorithm
+        function generateTerrain() {
+            const size = 129; // Must be 2^n + 1
+            terrainData = new Array(size).fill(null).map(() => new Array(size).fill(0));
+            
+            // Initialize corners
+            terrainData[0][0] = Math.random();
+            terrainData[0][size-1] = Math.random();
+            terrainData[size-1][0] = Math.random();
+            terrainData[size-1][size-1] = Math.random();
+            
+            diamondSquare(terrainData, size, 0.5);
+            
+            // Convert to boolean land/sea map
+            const threshold = 0.4;
+            for (let i = 0; i < size; i++) {
+                for (let j = 0; j < size; j++) {
+                    terrainData[i][j] = terrainData[i][j] > threshold;
+                }
+            }
+        }
+        
+        function diamondSquare(grid, size, roughness) {
+            let stepSize = size - 1;
+            
+            while (stepSize > 1) {
+                let halfStep = Math.floor(stepSize / 2);
+                
+                // Diamond step
+                for (let y = halfStep; y < size; y += stepSize) {
+                    for (let x = halfStep; x < size; x += stepSize) {
+                        let sum = grid[y - halfStep][x - halfStep] +
+                                 grid[y - halfStep][x + halfStep] +
+                                 grid[y + halfStep][x - halfStep] +
+                                 grid[y + halfStep][x + halfStep];
+                        grid[y][x] = sum / 4 + (Math.random() - 0.5) * roughness;
+                    }
+                }
+                
+                // Square step
+                for (let y = 0; y < size; y += halfStep) {
+                    for (let x = (y + halfStep) % stepSize; x < size; x += stepSize) {
+                        let sum = 0;
+                        let count = 0;
+                        
+                        if (y - halfStep >= 0) { sum += grid[y - halfStep][x]; count++; }
+                        if (y + halfStep < size) { sum += grid[y + halfStep][x]; count++; }
+                        if (x - halfStep >= 0) { sum += grid[y][x - halfStep]; count++; }
+                        if (x + halfStep < size) { sum += grid[y][x + halfStep]; count++; }
+                        
+                        grid[y][x] = sum / count + (Math.random() - 0.5) * roughness;
+                    }
+                }
+                
+                stepSize = halfStep;
+                roughness *= 0.5;
+            }
+        }
+        
+        // Place epicenter and stations
+        function placeEpicenterAndStations() {
+            // Find land pixels
+            const landPixels = [];
+            const terrainSize = terrainData.length;
+            const scaleX = canvas.width / terrainSize;
+            const scaleY = canvas.height / terrainSize;
+            
+            for (let i = 0; i < terrainSize; i++) {
+                for (let j = 0; j < terrainSize; j++) {
+                    if (terrainData[i][j]) {
+                        landPixels.push({
+                            x: j * scaleX,
+                            y: i * scaleY
+                        });
+                    }
+                }
+            }
+            
+            // Place epicenter randomly on land
+            const epicenterIndex = Math.floor(Math.random() * landPixels.length);
+            gameState.trueEpicenter = landPixels[epicenterIndex];
+            
+            // Place stations on land
+            gameState.stations = [];
+            const usedIndices = new Set([epicenterIndex]);
+            
+            for (let i = 0; i < gameState.difficulty; i++) {
+                let stationIndex;
+                do {
+                    stationIndex = Math.floor(Math.random() * landPixels.length);
+                } while (usedIndices.has(stationIndex));
+                
+                usedIndices.add(stationIndex);
+                const station = landPixels[stationIndex];
+                
+                // Calculate distance and P-wave arrival time
+                const distance = Math.sqrt(
+                    Math.pow(station.x - gameState.trueEpicenter.x, 2) + 
+                    Math.pow(station.y - gameState.trueEpicenter.y, 2)
+                );
+                
+                // Convert pixel distance to km (scale so max time is ~20 seconds)
+                gameState.mapScale = 120 / Math.max(canvas.width, canvas.height); // km per pixel
+                const distanceKm = distance * gameState.mapScale;
+                const arrivalTime = distanceKm / 6; // P-wave speed 6 km/s
+                
+                gameState.stations.push({
+                    x: station.x,
+                    y: station.y,
+                    arrivalTime: arrivalTime,
+                    name: `観測点${i + 1}`
+                });
+            }
+        }
+        
+        // Drawing functions
+        function drawMap() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw terrain
+            drawTerrain();
+            
+            // Draw stations
+            drawStations();
+            
+            // Draw user estimate if placed
+            if (gameState.userEstimate) {
+                drawUserEstimate();
+            }
+            
+            // Draw true epicenter if submitted
+            if (gameState.submitted) {
+                drawTrueEpicenter();
+                drawError();
+            }
+        }
+        
+        function drawTerrain() {
+            const terrainSize = terrainData.length;
+            const scaleX = canvas.width / terrainSize;
+            const scaleY = canvas.height / terrainSize;
+            
+            // Draw sea background
+            ctx.fillStyle = '#4682B4';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw land
+            ctx.fillStyle = '#228B22';
+            for (let i = 0; i < terrainSize; i++) {
+                for (let j = 0; j < terrainSize; j++) {
+                    if (terrainData[i][j]) {
+                        ctx.fillRect(j * scaleX, i * scaleY, scaleX + 1, scaleY + 1);
+                    }
+                }
+            }
+            
+            // Draw land borders
+            ctx.strokeStyle = '#006400';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < terrainSize - 1; i++) {
+                for (let j = 0; j < terrainSize - 1; j++) {
+                    if (terrainData[i][j] !== terrainData[i+1][j]) {
+                        ctx.beginPath();
+                        ctx.moveTo(j * scaleX, (i+1) * scaleY);
+                        ctx.lineTo((j+1) * scaleX, (i+1) * scaleY);
+                        ctx.stroke();
+                    }
+                    if (terrainData[i][j] !== terrainData[i][j+1]) {
+                        ctx.beginPath();
+                        ctx.moveTo((j+1) * scaleX, i * scaleY);
+                        ctx.lineTo((j+1) * scaleX, (i+1) * scaleY);
+                        ctx.stroke();
+                    }
+                }
+            }
+        }
+        
+        function drawStations() {
+            gameState.stations.forEach((station, index) => {
+                // Draw station marker
+                ctx.fillStyle = '#FFD700';
+                ctx.strokeStyle = '#FF8C00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(station.x, station.y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                
+                // Draw station label
+                ctx.fillStyle = '#000';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(station.name, station.x, station.y - 15);
+            });
+        }
+        
+        function drawUserEstimate() {
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(gameState.userEstimate.x - 10, gameState.userEstimate.y);
+            ctx.lineTo(gameState.userEstimate.x + 10, gameState.userEstimate.y);
+            ctx.moveTo(gameState.userEstimate.x, gameState.userEstimate.y - 10);
+            ctx.lineTo(gameState.userEstimate.x, gameState.userEstimate.y + 10);
+            ctx.stroke();
+        }
+        
+        function drawTrueEpicenter() {
+            ctx.fillStyle = '#FF0000';
+            ctx.strokeStyle = '#8B0000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(gameState.trueEpicenter.x, gameState.trueEpicenter.y, 10, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+        }
+        
+        function drawError() {
+            if (gameState.userEstimate) {
+                ctx.strokeStyle = '#FF00FF';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(gameState.trueEpicenter.x, gameState.trueEpicenter.y);
+                ctx.lineTo(gameState.userEstimate.x, gameState.userEstimate.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        // Hint animation
+        function activateHint() {
+            if (gameState.hintActive) return;
+            
+            gameState.hintActive = true;
+            document.getElementById('hint-btn').disabled = true;
+            
+            hintStartTime = Date.now();
+            animateHint();
+        }
+        
+        function animateHint() {
+            const currentTime = Date.now();
+            const elapsed = (currentTime - hintStartTime) / 1000; // seconds
+            
+            // Clear and redraw base map
+            drawMap();
+            
+            // Calculate max arrival time for synchronization
+            const maxArrivalTime = Math.max(...gameState.stations.map(s => s.arrivalTime));
+            
+            // Draw expanding circles from each station
+            gameState.stations.forEach(station => {
+                // Calculate delay so all circles converge at the same time
+                const delay = maxArrivalTime - station.arrivalTime;
+                const adjustedTime = elapsed - delay;
+                
+                if (adjustedTime > 0) {
+                    const radius = adjustedTime * 6 / gameState.mapScale; // 6 km/s converted to pixels
+                    
+                    if (radius > 0 && radius < 1000) { // Don't draw if too large
+                        ctx.strokeStyle = `rgba(255, 255, 0, ${Math.max(0.1, 1 - radius/500)})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(station.x, station.y, radius, 0, 2 * Math.PI);
+                        ctx.stroke();
+                    }
+                }
+            });
+            
+            // Continue animation
+            if (elapsed < maxArrivalTime + 5) {
+                animationId = requestAnimationFrame(animateHint);
+            } else {
+                // Animation complete
+                gameState.hintActive = false;
+                drawMap();
+            }
+        }
+        
+        // Mouse interaction
+        canvas.addEventListener('mousemove', handleMouseMove);
+        canvas.addEventListener('click', handleMouseClick);
+        canvas.addEventListener('mouseleave', hideTooltip);
+        
+        function handleMouseMove(event) {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            // Check if hovering over a station
+            let hoveringStation = null;
+            gameState.stations.forEach(station => {
+                const distance = Math.sqrt((x - station.x) ** 2 + (y - station.y) ** 2);
+                if (distance <= 15) {
+                    hoveringStation = station;
+                }
+            });
+            
+            if (hoveringStation) {
+                showTooltip(event.pageX, event.pageY, 
+                    `P波到達: ${hoveringStation.arrivalTime.toFixed(1)}秒`);
+            } else {
+                hideTooltip();
+            }
+        }
+        
+        function handleMouseClick(event) {
+            if (gameState.submitted) return;
+            
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            
+            // Set user estimate
+            gameState.userEstimate = { x, y };
+            document.getElementById('submit-btn').disabled = false;
+            
+            drawMap();
+        }
+        
+        function showTooltip(x, y, text) {
+            const tooltip = document.getElementById('tooltip');
+            tooltip.textContent = text;
+            tooltip.style.left = x + 10 + 'px';
+            tooltip.style.top = y - 30 + 'px';
+            tooltip.classList.remove('hidden');
+        }
+        
+        function hideTooltip() {
+            document.getElementById('tooltip').classList.add('hidden');
+        }
+        
+        // Game logic
+        function submitEstimate() {
+            if (!gameState.userEstimate) return;
+            
+            gameState.submitted = true;
+            
+            // Calculate error distance
+            const errorPixels = Math.sqrt(
+                (gameState.userEstimate.x - gameState.trueEpicenter.x) ** 2 +
+                (gameState.userEstimate.y - gameState.trueEpicenter.y) ** 2
+            );
+            const errorKm = errorPixels * gameState.mapScale;
+            
+            // Calculate score
+            let score = 0;
+            if (errorKm < 10) score = 100;
+            else if (errorKm < 30) score = 70;
+            else if (errorKm < 60) score = 40;
+            
+            gameState.currentRoundScore = score;
+            gameState.totalScore += score;
+            
+            // Update display
+            document.getElementById('current-score').textContent = gameState.totalScore;
+            document.getElementById('submit-btn').disabled = true;
+            
+            // Show results
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <h3>ラウンド ${gameState.round} 結果</h3>
+                <p>誤差: ${errorKm.toFixed(1)} km</p>
+                <p>獲得スコア: ${score}</p>
+            `;
+            resultsDiv.classList.remove('hidden');
+            
+            // Show next button or finish game
+            if (gameState.round < 5) {
+                document.getElementById('next-btn').classList.remove('hidden');
+            } else {
+                finishGame();
+            }
+            
+            drawMap();
+        }
+        
+        function nextRound() {
+            gameState.round++;
+            startNewRound();
+        }
+        
+        function finishGame() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('final-screen').classList.remove('hidden');
+            
+            const finalScoreDiv = document.getElementById('final-score');
+            const finalMessageDiv = document.getElementById('final-message');
+            
+            finalScoreDiv.innerHTML = `<h3>合計スコア: ${gameState.totalScore}</h3>`;
+            
+            if (gameState.totalScore >= 400) {
+                finalMessageDiv.innerHTML = '<h2 style="color: #ff6b6b;">素晴らしい！完璧です！</h2>';
+                showConfetti();
+                showParticleEffect();
+            } else if (gameState.totalScore >= 200) {
+                finalMessageDiv.innerHTML = '<h3 style="color: #ffa500;">その調子です！</h3>';
+            } else {
+                finalMessageDiv.innerHTML = '<h3 style="color: #666;">練習を続けましょう！</h3>';
+            }
+        }
+        
+        function showConfetti() {
+            const confettiContainer = document.getElementById('confetti');
+            confettiContainer.classList.remove('hidden');
+            
+            const colors = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24', '#6c5ce7', '#a0e7e5'];
+            
+            for (let i = 0; i < 300; i++) {
+                const confettiPiece = document.createElement('div');
+                confettiPiece.className = 'confetti-piece';
+                
+                // Random horizontal position
+                confettiPiece.style.left = Math.random() * 100 + '%';
+                
+                // Random initial top position (off-screen)
+                confettiPiece.style.top = (-5 - Math.random() * 15) + '%';
+                
+                // Random color
+                confettiPiece.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                
+                // Random initial horizontal velocity and drift
+                const initialX = (Math.random() - 0.5) * 100;
+                const driftX = (Math.random() - 0.5) * 200;
+                confettiPiece.style.setProperty('--initial-x', initialX + 'px');
+                confettiPiece.style.setProperty('--drift-x', driftX + 'px');
+                
+                // Extended random animation delay (0-4s)
+                confettiPiece.style.animationDelay = Math.random() * 4 + 's';
+                
+                // Extended random animation duration (2-6s)
+                confettiPiece.style.animationDuration = (Math.random() * 4 + 2) + 's';
+                
+                confettiContainer.appendChild(confettiPiece);
+            }
+            
+            setTimeout(() => {
+                confettiContainer.classList.add('hidden');
+                confettiContainer.innerHTML = '';
+            }, 8000);
+        }
+        
+        function restartGame() {
+            // Reset game state
+            gameState = {
+                difficulty: 0,
+                round: 1,
+                totalScore: 0,
+                currentRoundScore: 0,
+                stations: [],
+                trueEpicenter: null,
+                userEstimate: null,
+                mapScale: 1,
+                hintActive: false,
+                submitted: false
+            };
+            
+            // Show difficulty selection
+            document.getElementById('final-screen').classList.add('hidden');
+            document.getElementById('difficulty-screen').classList.remove('hidden');
+        }
+        
+        // Particle effect system
+        let particleCanvas = null;
+        let particleCtx = null;
+        let particles = [];
+        let particleAnimationId = null;
+        let mouseX = 0;
+        let mouseY = 0;
+        
+        function showParticleEffect() {
+            particleCanvas = document.getElementById('particle-canvas');
+            particleCanvas.width = window.innerWidth;
+            particleCanvas.height = window.innerHeight;
+            particleCanvas.classList.remove('hidden');
+            
+            particleCtx = particleCanvas.getContext('2d');
+            particles = [];
+            
+            // Generate particles
+            const centerX = particleCanvas.width / 2;
+            const centerY = particleCanvas.height / 2;
+            
+            for (let i = 0; i < 800; i++) {
+                particles.push({
+                    x: centerX + (Math.random() - 0.5) * 100,
+                    y: centerY + (Math.random() - 0.5) * 100,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    size: Math.random() * 4 + 1,
+                    life: 1.0,
+                    decay: Math.random() * 0.02 + 0.01,
+                    color: {
+                        r: Math.floor(Math.random() * 100) + 155,
+                        g: Math.floor(Math.random() * 100) + 155,
+                        b: Math.floor(Math.random() * 100) + 155
+                    },
+                    angle: Math.random() * Math.PI * 2,
+                    rotationSpeed: (Math.random() - 0.5) * 0.2
+                });
+            }
+            
+            // Add mouse interaction
+            particleCanvas.addEventListener('mousemove', updateMousePosition);
+            
+            // Start animation
+            animateParticles();
+            
+            // Clean up after 5 seconds
+            setTimeout(() => {
+                particleCanvas.removeEventListener('mousemove', updateMousePosition);
+                if (particleAnimationId) {
+                    cancelAnimationFrame(particleAnimationId);
+                    particleAnimationId = null;
+                }
+                particleCanvas.classList.add('hidden');
+                particles = [];
+            }, 5000);
+        }
+        
+        function updateMousePosition(event) {
+            mouseX = event.clientX;
+            mouseY = event.clientY;
+        }
+        
+        function animateParticles() {
+            if (!particleCtx) return;
+            
+            // Clear canvas
+            particleCtx.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+            
+            // Update and draw particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                
+                // Mouse interaction (subtle attraction/repulsion)
+                const dx = mouseX - particle.x;
+                const dy = mouseY - particle.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < 150) {
+                    const force = (150 - distance) / 150 * 0.5;
+                    particle.vx += (dx / distance) * force * 0.1;
+                    particle.vy += (dy / distance) * force * 0.1; // Fix: Added particle.vy update
+                }
+                
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life -= particle.decay;
+                particle.angle += particle.rotationSpeed;
+                
+                // Remove dead particles
+                if (particle.life <= 0) {
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                // Draw particle
+                particleCtx.save();
+                particleCtx.translate(particle.x, particle.y);
+                particleCtx.rotate(particle.angle);
+                
+                particleCtx.fillStyle = `rgba(${particle.color.r}, ${particle.color.g}, ${particle.color.b}, ${particle.life})`;
+                particleCtx.fillRect(-particle.size / 2, -particle.size / 2, particle.size, particle.size);
+                
+                particleCtx.restore();
+            }
+            
+            particleAnimationId = requestAnimationFrame(animateParticles);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>震央推定ゲーム</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 10px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #333; min-height: 100vh; }
+        .container { max-width: 100%; margin: 0 auto; background: white; border-radius: 10px; box-shadow: 0 5px 20px rgba(0,0,0,0.3); overflow: hidden; }
+        .header { background: linear-gradient(45deg, #ff6b6b, #ee5a24); color: white; padding: 15px; text-align: center; }
+        h1 { margin: 0; font-size: 1.8em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .game-area { padding: 15px; }
+        .difficulty-btn, .control-btn { background: linear-gradient(45deg, #4CAF50, #45a049); color: white; border: none; padding: 12px 20px; margin: 5px; border-radius: 20px; cursor: pointer; font-size: 14px; transition: all 0.3s ease; box-shadow: 0 3px 10px rgba(0,0,0,0.2); }
+        .control-btn { background: linear-gradient(45deg, #2196F3, #1976D2); }
+        .control-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .game-controls { display: flex; justify-content: center; gap: 10px; margin: 15px 0; flex-wrap: wrap; }
+        .canvas-container { display: flex; justify-content: center; margin: 15px 0; }
+        canvas { border: 2px solid #333; border-radius: 5px; cursor: crosshair; max-width: 100%; height: auto; touch-action: none; }
+        .game-info { display: flex; justify-content: space-between; background: #f8f9fa; padding: 10px; border-radius: 5px; margin: 15px 0; font-size: 16px; font-weight: bold; }
+        .station-data { background: #e3f2fd; padding: 15px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #2196F3; }
+        .station-item { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #ddd; }
+        .station-item:last-child { border-bottom: none; }
+        .results { text-align: center; margin: 15px 0; padding: 15px; background: #f8f9fa; border-radius: 10px; border-left: 5px solid #e74c3c; }
+        .final-results { text-align: center; padding: 20px; background: linear-gradient(45deg, #ffd700, #ffed4a); border-radius: 10px; margin: 15px 0; }
+        .hidden { display: none; }
+        .instructions { background: #e3f2fd; padding: 10px; border-radius: 10px; margin: 15px 0; border-left: 4px solid #2196F3; font-size: 14px; }
+        .instructions h3 { margin-top: 0; }
+        .confetti { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
+        @keyframes fall { 0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
+        .confetti-piece { position: absolute; width: 8px; height: 8px; background-color: #ff6b6b; animation: fall 3s linear infinite; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌏 震央推定ゲーム 🌏</h1>
+        </div>
+        
+        <div class="game-area">
+            <div id="difficulty-screen">
+                <div class="instructions">
+                    <h3>ゲーム説明</h3>
+                    <p>地震観測点のP波到達時間から震央を推定するゲームです。各観測点の到達時間を参考に、マップ上の震央位置をタップして決定してください。</p>
+                    <p><strong>ヒント機能：</strong>各観測点から波紋が広がるアニメーションで震央の大まかな位置を確認できます。</p>
+                </div>
+                <div style="text-align: center;">
+                    <h3>難易度選択</h3>
+                    <button class="difficulty-btn" onclick="selectDifficulty(5)">レベル1 (観測点5)</button>
+                    <button class="difficulty-btn" onclick="selectDifficulty(3)">レベル2 (観測点3)</button>
+                    <button class="difficulty-btn" onclick="selectDifficulty(2)">レベル3 (観測点2)</button>
+                </div>
+            </div>
+            
+            <div id="game-screen" class="hidden">
+                <div class="game-info">
+                    <div style="color: #3498db;">ラウンド: <span id="current-round">1</span>/5</div>
+                    <div style="color: #e74c3c;">スコア: <span id="current-score">0</span></div>
+                </div>
+                
+                <div class="game-controls">
+                    <button id="hint-btn" class="control-btn" onclick="activateHint()">ヒント</button>
+                    <button id="submit-btn" class="control-btn" onclick="submitEstimate()" disabled>結果をみる</button>
+                    <button id="next-btn" class="control-btn hidden" onclick="nextRound()">次のラウンド</button>
+                </div>
+                
+                <div class="canvas-container">
+                    <canvas id="game-canvas" width="400" height="300"></canvas>
+                </div>
+                
+                <div id="station-data" class="station-data">
+                    <h4>観測点データ (P波到達時間)</h4>
+                    <div id="station-list"></div>
+                </div>
+                
+                <div id="results" class="results hidden"></div>
+            </div>
+            
+            <div id="final-screen" class="hidden">
+                <div class="final-results">
+                    <h2>ゲーム終了！</h2>
+                    <div id="final-score"></div>
+                    <div id="final-message"></div>
+                    <button class="difficulty-btn" onclick="restartGame()">もう一度プレイ</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="confetti" class="confetti hidden"></div>
+    
+    <script>
+        let gs = { d: 0, r: 1, s: 0, st: [], te: null, ue: null, ms: 1, ha: false, sub: false };
+        let cv = document.getElementById('game-canvas');
+        let ctx = cv.getContext('2d');
+        let td = null;
+        let aid = null;
+        let hst = null;
+        
+        function selectDifficulty(stations) {
+            gs.d = stations;
+            document.getElementById('difficulty-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            startNewRound();
+        }
+        
+        function startNewRound() {
+            gs.ha = false; gs.sub = false; gs.ue = null;
+            if (aid) { cancelAnimationFrame(aid); aid = null; }
+            hst = null;
+            
+            document.getElementById('current-round').textContent = gs.r;
+            document.getElementById('current-score').textContent = gs.s;
+            document.getElementById('hint-btn').disabled = false;
+            document.getElementById('submit-btn').disabled = true;
+            document.getElementById('next-btn').classList.add('hidden');
+            document.getElementById('results').classList.add('hidden');
+            
+            generateTerrain();
+            placeEpicenterAndStations();
+            updateStationList();
+            drawMap();
+        }
+        
+        function generateTerrain() {
+            const sz = 65;
+            td = new Array(sz).fill(null).map(() => new Array(sz).fill(0));
+            td[0][0] = Math.random(); td[0][sz-1] = Math.random();
+            td[sz-1][0] = Math.random(); td[sz-1][sz-1] = Math.random();
+            diamondSquare(td, sz, 0.5);
+            const th = 0.4;
+            for (let i = 0; i < sz; i++) {
+                for (let j = 0; j < sz; j++) {
+                    td[i][j] = td[i][j] > th;
+                }
+            }
+        }
+        
+        function diamondSquare(g, sz, r) {
+            let ss = sz - 1;
+            while (ss > 1) {
+                let hs = Math.floor(ss / 2);
+                for (let y = hs; y < sz; y += ss) {
+                    for (let x = hs; x < sz; x += ss) {
+                        let sum = g[y-hs][x-hs] + g[y-hs][x+hs] + g[y+hs][x-hs] + g[y+hs][x+hs];
+                        g[y][x] = sum / 4 + (Math.random() - 0.5) * r;
+                    }
+                }
+                for (let y = 0; y < sz; y += hs) {
+                    for (let x = (y + hs) % ss; x < sz; x += ss) {
+                        let sum = 0, cnt = 0;
+                        if (y - hs >= 0) { sum += g[y-hs][x]; cnt++; }
+                        if (y + hs < sz) { sum += g[y+hs][x]; cnt++; }
+                        if (x - hs >= 0) { sum += g[y][x-hs]; cnt++; }
+                        if (x + hs < sz) { sum += g[y][x+hs]; cnt++; }
+                        g[y][x] = sum / cnt + (Math.random() - 0.5) * r;
+                    }
+                }
+                ss = hs; r *= 0.5;
+            }
+        }
+        
+        function placeEpicenterAndStations() {
+            const lp = [];
+            const tsz = td.length;
+            const sx = cv.width / tsz;
+            const sy = cv.height / tsz;
+            
+            for (let i = 0; i < tsz; i++) {
+                for (let j = 0; j < tsz; j++) {
+                    if (td[i][j]) {
+                        lp.push({ x: j * sx, y: i * sy });
+                    }
+                }
+            }
+            
+            const ei = Math.floor(Math.random() * lp.length);
+            gs.te = lp[ei];
+            
+            gs.st = [];
+            const ui = new Set([ei]);
+            
+            for (let i = 0; i < gs.d; i++) {
+                let si;
+                do { si = Math.floor(Math.random() * lp.length); } while (ui.has(si));
+                ui.add(si);
+                const st = lp[si];
+                const d = Math.sqrt(Math.pow(st.x - gs.te.x, 2) + Math.pow(st.y - gs.te.y, 2));
+                gs.ms = 120 / Math.max(cv.width, cv.height);
+                const dk = d * gs.ms;
+                const at = dk / 6;
+                gs.st.push({ x: st.x, y: st.y, arrivalTime: at, name: `観測点${i + 1}` });
+            }
+        }
+        
+        function updateStationList() {
+            const sl = document.getElementById('station-list');
+            sl.innerHTML = '';
+            gs.st.forEach(st => {
+                const item = document.createElement('div');
+                item.className = 'station-item';
+                item.innerHTML = `<span>${st.name}</span><span>${st.arrivalTime.toFixed(1)}秒</span>`;
+                sl.appendChild(item);
+            });
+        }
+        
+        function drawMap() {
+            ctx.clearRect(0, 0, cv.width, cv.height);
+            drawTerrain();
+            drawStations();
+            if (gs.ue) drawUserEstimate();
+            if (gs.sub) { drawTrueEpicenter(); drawError(); }
+        }
+        
+        function drawTerrain() {
+            const tsz = td.length;
+            const sx = cv.width / tsz;
+            const sy = cv.height / tsz;
+            
+            ctx.fillStyle = '#4682B4';
+            ctx.fillRect(0, 0, cv.width, cv.height);
+            
+            ctx.fillStyle = '#228B22';
+            for (let i = 0; i < tsz; i++) {
+                for (let j = 0; j < tsz; j++) {
+                    if (td[i][j]) {
+                        ctx.fillRect(j * sx, i * sy, sx + 1, sy + 1);
+                    }
+                }
+            }
+        }
+        
+        function drawStations() {
+            gs.st.forEach((st, idx) => {
+                ctx.fillStyle = '#FFD700';
+                ctx.strokeStyle = '#FF8C00';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(st.x, st.y, 6, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+                
+                ctx.fillStyle = '#000';
+                ctx.font = '10px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(st.name, st.x, st.y - 12);
+            });
+        }
+        
+        function drawUserEstimate() {
+            ctx.strokeStyle = '#00FF00';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(gs.ue.x - 8, gs.ue.y);
+            ctx.lineTo(gs.ue.x + 8, gs.ue.y);
+            ctx.moveTo(gs.ue.x, gs.ue.y - 8);
+            ctx.lineTo(gs.ue.x, gs.ue.y + 8);
+            ctx.stroke();
+        }
+        
+        function drawTrueEpicenter() {
+            ctx.fillStyle = '#FF0000';
+            ctx.strokeStyle = '#8B0000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(gs.te.x, gs.te.y, 8, 0, 2 * Math.PI);
+            ctx.fill();
+            ctx.stroke();
+        }
+        
+        function drawError() {
+            if (gs.ue) {
+                ctx.strokeStyle = '#FF00FF';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(gs.te.x, gs.te.y);
+                ctx.lineTo(gs.ue.x, gs.ue.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+        }
+        
+        function activateHint() {
+            if (gs.ha) return;
+            gs.ha = true;
+            document.getElementById('hint-btn').disabled = true;
+            hst = Date.now();
+            animateHint();
+        }
+        
+        function animateHint() {
+            const ct = Date.now();
+            const el = (ct - hst) / 1000;
+            drawMap();
+            
+            const mat = Math.max(...gs.st.map(s => s.arrivalTime));
+            
+            gs.st.forEach(st => {
+                const del = mat - st.arrivalTime;
+                const at = el - del;
+                
+                if (at > 0) {
+                    const r = at * 6 / gs.ms;
+                    if (r > 0 && r < 500) {
+                        ctx.strokeStyle = `rgba(255, 255, 0, ${Math.max(0.1, 1 - r/250)})`;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.arc(st.x, st.y, r, 0, 2 * Math.PI);
+                        ctx.stroke();
+                    }
+                }
+            });
+            
+            if (el < mat + 3) {
+                aid = requestAnimationFrame(animateHint);
+            } else {
+                gs.ha = false;
+                drawMap();
+            }
+        }
+        
+        function getCanvasCoordinates(event) {
+            const rect = cv.getBoundingClientRect();
+            const scaleX = cv.width / rect.width;
+            const scaleY = cv.height / rect.height;
+            
+            let clientX, clientY;
+            if (event.changedTouches && event.changedTouches.length > 0) {
+                clientX = event.changedTouches[0].clientX;
+                clientY = event.changedTouches[0].clientY;
+            } else {
+                clientX = event.clientX;
+                clientY = event.clientY;
+            }
+            
+            return {
+                x: (clientX - rect.left) * scaleX,
+                y: (clientY - rect.top) * scaleY
+            };
+        }
+        
+        function handleCanvasClick(event) {
+            event.preventDefault();
+            if (gs.sub) return;
+            
+            const coords = getCanvasCoordinates(event);
+            gs.ue = coords;
+            document.getElementById('submit-btn').disabled = false;
+            drawMap();
+        }
+        
+        cv.addEventListener('click', handleCanvasClick);
+        cv.addEventListener('touchend', handleCanvasClick);
+        
+        function submitEstimate() {
+            if (!gs.ue) return;
+            gs.sub = true;
+            
+            const ep = Math.sqrt((gs.ue.x - gs.te.x) ** 2 + (gs.ue.y - gs.te.y) ** 2);
+            const ek = ep * gs.ms;
+            
+            let sc = 0;
+            if (ek < 10) sc = 100;
+            else if (ek < 30) sc = 70;
+            else if (ek < 60) sc = 40;
+            
+            gs.s += sc;
+            document.getElementById('current-score').textContent = gs.s;
+            document.getElementById('submit-btn').disabled = true;
+            
+            document.getElementById('results').innerHTML = `<h3>ラウンド ${gs.r} 結果</h3><p>誤差: ${ek.toFixed(1)} km</p><p>獲得スコア: ${sc}</p>`;
+            document.getElementById('results').classList.remove('hidden');
+            
+            if (gs.r < 5) {
+                document.getElementById('next-btn').classList.remove('hidden');
+            } else {
+                finishGame();
+            }
+            
+            drawMap();
+        }
+        
+        function nextRound() {
+            gs.r++;
+            startNewRound();
+        }
+        
+        function finishGame() {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('final-screen').classList.remove('hidden');
+            
+            document.getElementById('final-score').innerHTML = `<h3>合計スコア: ${gs.s}</h3>`;
+            
+            if (gs.s >= 400) {
+                document.getElementById('final-message').innerHTML = '<h2 style="color: #ff6b6b;">素晴らしい！</h2>';
+                showConfetti();
+            } else if (gs.s >= 200) {
+                document.getElementById('final-message').innerHTML = '<h3 style="color: #ffa500;">まずますの結果です！</h3>';
+            } else {
+                document.getElementById('final-message').innerHTML = '<h3 style="color: #666;">練習を続けましょう！</h3>';
+            }
+        }
+        
+        function showConfetti() {
+            const cc = document.getElementById('confetti');
+            cc.classList.remove('hidden');
+            
+            for (let i = 0; i < 100; i++) {
+                const cp = document.createElement('div');
+                cp.className = 'confetti-piece';
+                cp.style.left = Math.random() * 100 + '%';
+                cp.style.animationDelay = Math.random() * 3 + 's';
+                cp.style.backgroundColor = ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24'][Math.floor(Math.random() * 4)];
+                cc.appendChild(cp);
+            }
+            
+            setTimeout(() => {
+                cc.classList.add('hidden');
+                cc.innerHTML = '';
+            }, 5000);
+        }
+        
+        function restartGame() {
+            gs = { d: 0, r: 1, s: 0, st: [], te: null, ue: null, ms: 1, ha: false, sub: false };
+            document.getElementById('final-screen').classList.add('hidden');
+            document.getElementById('difficulty-screen').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
