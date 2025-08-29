@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EpiGuessr - Disaster Prevention Control Center</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    <!-- Added digital gauge fonts for control room aesthetic -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Russo+One&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Complete CSS overhaul for near-future control room theme */
+        body {
+            font-family: 'Orbitron', monospace;
+            background: #0f172a;
+            background-image: 
+                radial-gradient(circle at 25% 25%, rgba(30, 58, 138, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 75% 75%, rgba(234, 88, 12, 0.1) 0%, transparent 50%),
+                linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        /* Seismic wave animation for background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: 
+                repeating-linear-gradient(
+                    90deg,
+                    transparent,
+                    transparent 98px,
+                    rgba(30, 58, 138, 0.03) 100px
+                ),
+                repeating-linear-gradient(
+                    0deg,
+                    transparent,
+                    transparent 98px,
+                    rgba(30, 58, 138, 0.03) 100px
+                );
+            animation: seismicGrid 20s linear infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        @keyframes seismicGrid {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(100px, 100px); }
+        }
+
+        /* Glassmorphism container with control room styling */
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 
+                0 25px 50px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 0 0 1px rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            max-width: 95vw;
+            max-height: 95vh;
+            overflow: auto;
+            position: relative;
+        }
+
+        .container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #1e3a8a, #ea580c, transparent);
+            animation: scanLine 3s ease-in-out infinite;
+        }
+
+        @keyframes scanLine {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        #confetti-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 9999;
+            pointer-events: none;
+        }
+
+        .screen {
+            display: none;
+            text-align: center;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        /* Digital display style title with neon glow */
+        h1 {
+            font-family: 'Russo One', sans-serif;
+            font-size: 2.8em;
+            margin-bottom: 20px;
+            /* Reduced glow intensity for better readability */
+            text-shadow: 
+                0 0 2px #00d9ff,
+                0 0 2px #00d9ff,
+                0 0 2px #00d9ff;
+            /* Changed gradient colors to bright cyan and orange for better contrast */
+            background: linear-gradient(45deg, #00d9ff, #ff6b35, #00d9ff);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: titleGlow 4s ease-in-out infinite;
+        }
+
+        @keyframes titleGlow {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .intro-text {
+            font-size: 1.1em;
+            line-height: 1.8;
+            margin-bottom: 30px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            opacity: 0.9;
+        }
+
+        /* Control panel style options */
+        .game-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .option-group {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(10px);
+            padding: 25px;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 10px 20px rgba(0, 0, 0, 0.2);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .option-group::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #1e3a8a, transparent);
+            animation: optionScan 3s linear infinite;
+        }
+
+        @keyframes optionScan {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .option-group h3 {
+            margin-bottom: 15px;
+            color: #00d9ff;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            text-shadow: 0 0 10px rgba(30, 58, 138, 0.5);
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: #ffffff;
+            font-size: 16px;
+            font-family: 'Orbitron', monospace;
+            transition: all 0.3s ease;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #ea580c;
+            box-shadow: 0 0 20px rgba(234, 88, 12, 0.3);
+        }
+
+        select option {
+            background: #1e293b;
+            color: #ffffff;
+        }
+
+        /* Neon glow buttons with control room styling */
+        .btn {
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 15px 35px;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 
+                0 0 20px rgba(30, 58, 138, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 
+                0 0 30px rgba(30, 58, 138, 0.6),
+                0 10px 25px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:active {
+            transform: translateY(-1px);
+            box-shadow: 
+                0 0 40px rgba(234, 88, 12, 0.8),
+                0 5px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 0 10px rgba(30, 58, 138, 0.1);
+        }
+
+        .btn:disabled:hover {
+            transform: none;
+            text-shadow: none;
+        }
+
+        /* Dashboard-style game UI */
+        .game-ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 15px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
+        }
+
+        .ui-left {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .ui-right {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+
+        /* 7-segment digital style displays */
+        .score-display, .round-display, .timer-display {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-family: 'Orbitron', monospace;
+            font-weight: 900;
+            font-size: 18px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 
+                inset 0 0 20px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(16, 185, 129, 0.3);
+            text-shadow: 0 0 10px currentColor;
+            letter-spacing: 2px;
+        }
+
+        .score-display {
+            color: #10b981;
+            text-shadow: 0 0 15px #10b981;
+        }
+
+        .round-display {
+            color: #3b82f6;
+            text-shadow: 0 0 15px #3b82f6;
+        }
+
+        .timer-display {
+            color: #ea580c; /* Bright Orange for urgency */
+            text-shadow: 0 0 15px #ea580c;
+            box-shadow: 
+                inset 0 0 20px rgba(0, 0, 0, 0.5),
+                0 0 20px rgba(234, 88, 12, 0.3);
+        }
+
+        /* Dashboard frame around canvas */
+        .canvas-container {
+            position: relative;
+            display: inline-block;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                inset 0 0 50px rgba(0, 0, 0, 0.3),
+                0 0 30px rgba(30, 58, 138, 0.2);
+        }
+
+        .canvas-container::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 1px solid rgba(30, 58, 138, 0.3);
+            border-radius: 15px;
+            pointer-events: none;
+        }
+
+        .canvas-container::after {
+            content: 'SEISMIC MONITORING SYSTEM';
+            position: absolute;
+            top: -10px;
+            left: 30px;
+            background: #0f172a;
+            padding: 5px 15px;
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: #1e3a8a;
+            text-shadow: 0 0 10px rgba(30, 58, 138, 0.5);
+            letter-spacing: 1px;
+        }
+
+        .game-canvas {
+            border: 2px solid rgba(30, 58, 138, 0.5);
+            border-radius: 10px;
+            background: #000;
+            cursor: crosshair;
+            display: block;
+            box-shadow: 
+                inset 0 0 30px rgba(0, 0, 0, 0.8),
+                0 0 20px rgba(30, 58, 138, 0.3);
+        }
+
+        /* Enhanced legend with control room styling */
+        .legend {
+            margin-top: 25px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .legend-gradient {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .gradient-bar {
+            width: 250px;
+            height: 25px;
+            background: linear-gradient(to right, #ff4444, #4444ff);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            box-shadow: 
+                inset 0 0 10px rgba(0, 0, 0, 0.3),
+                0 0 15px rgba(255, 255, 255, 0.1);
+        }
+
+        .legend span {
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+            letter-spacing: 1px;
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(10px);
+            color: #ffffff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-family: 'Orbitron', monospace;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.3);
+        }
+
+        /* Color-coded results panel */
+        .results-panel {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(15px);
+            padding: 25px;
+            border-radius: 15px;
+            margin-top: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 15px 35px rgba(0, 0, 0, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .results-panel.correct {
+            border-color: rgba(16, 185, 129, 0.5);
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 15px 35px rgba(0, 0, 0, 0.3),
+                0 0 30px rgba(16, 185, 129, 0.2);
+        }
+
+        .results-panel.incorrect {
+            border-color: rgba(234, 88, 12, 0.5);
+            box-shadow: 
+                inset 0 1px 0 rgba(255, 255, 255, 0.1),
+                0 15px 35px rgba(0, 0, 0, 0.3),
+                0 0 30px rgba(234, 88, 12, 0.2);
+        }
+
+        .results-panel h3 {
+            font-family: 'Orbitron', monospace;
+            font-weight: 700;
+            /* Changed from dark blue to bright cyan for better contrast */
+            color: #00d9ff;
+            text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+            margin-bottom: 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .final-results {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .final-score {
+            font-size: 4em;
+            margin: 30px 0;
+            /* Changed from dark blue to bright cyan for better contrast */
+            color: #00d9ff;
+            /* Reduced glow intensity for better readability */
+            text-shadow: 
+                0 0 10px #00d9ff,
+                0 0 20px #00d9ff;
+            font-family: 'Orbitron', monospace;
+            font-weight: 900;
+            letter-spacing: 3px;
+        }
+
+        .final-comment {
+            font-size: 1.8em;
+            margin: 25px 0;
+            font-weight: 700;
+            font-family: 'Russo One', sans-serif;
+            /* Reduced glow intensity for better readability */
+            color: #ffffff;
+            text-shadow: 
+                0 0 8px rgba(255, 255, 255, 0.5),
+                0 0 15px rgba(0, 217, 255, 0.3);
+        }
+
+        /* Responsive design for mobile */
+        @media (max-width: 768px) {
+            .container {
+                padding: 20px;
+                max-width: 98vw;
+            }
+
+            h1 {
+                font-size: 2.2em;
+            }
+
+            .game-options {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .game-ui {
+                flex-direction: column;
+                align-items: center;
+                gap: 15px;
+            }
+
+            .ui-left, .ui-right {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .canvas-container {
+                padding: 15px;
+            }
+
+            .game-canvas {
+                max-width: 100%;
+                height: auto;
+            }
+
+            .final-score {
+                font-size: 3em;
+            }
+        }
+
+        /* Additional seismic wave animations */
+        @keyframes seismicWave {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100vw); }
+        }
+
+        .seismic-wave {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 2px;
+            height: 100vh;
+            background: linear-gradient(to bottom, transparent, rgba(30, 58, 138, 0.3), transparent);
+            animation: seismicWave 8s linear infinite;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .seismic-wave:nth-child(2) {
+            animation-delay: -2s;
+            background: linear-gradient(to bottom, transparent, rgba(234, 88, 12, 0.2), transparent);
+        }
+
+        .seismic-wave:nth-child(3) {
+            animation-delay: -4s;
+            background: linear-gradient(to bottom, transparent, rgba(30, 58, 138, 0.2), transparent);
+        }
+    </style>
+</head>
+<body>
+    <!-- Added seismic wave animation elements -->
+    <div class="seismic-wave"></div>
+    <div class="seismic-wave"></div>
+    <div class="seismic-wave"></div>
+    
+    <canvas id="confetti-canvas"></canvas>
+
+    <div class="container">
+        <div id="intro-screen" class="screen active">
+            <h1 id="title">EpiGuessr Control Center</h1>
+            <div class="intro-text" id="intro-text">
+                Welcome to the Disaster Prevention Control Center! Your mission is to determine earthquake epicenter locations using advanced seismometer data analysis. Analyze P-wave arrival times at monitoring stations and deploy your estimation marker on the tactical map. Utilize color-coded station data and optional hint systems to maximize accuracy. Complete 5 operational rounds and achieve optimal performance ratings!
+            </div>
+            <div class="game-options">
+                <div class="option-group">
+                    <h3 id="difficulty-label">Mission Difficulty</h3>
+                    <select id="difficulty-select">
+                        <option value="easy">Beginner level (6 stations)</option>
+                        <option value="medium">Intermediate Level (4 stations)</option>
+                        <option value="hard">Expert Level (2 stations)</option>
+                    </select>
+                </div>
+                <div class="option-group">
+                    <h3 id="language-label">System Language</h3>
+                    <select id="language-select">
+                        <option value="en">English</option>
+                        <option value="ja">日本語</option>
+                    </select>
+                </div>
+            </div>
+            <button class="btn" id="start-btn">Initialize System</button>
+        </div>
+
+        <div id="game-screen" class="screen">
+            <div class="game-ui">
+                <div class="ui-left">
+                    <button class="btn" id="hint-btn">Seismic Analysis (-30%)</button>
+                    <button class="btn" id="results-btn" disabled>Generate Report</button>
+                </div>
+                <div class="ui-right">
+                    <div class="timer-display" id="timer-display">Time: 60</div>
+                    <div class="round-display" id="round-display">Mission 1/5</div>
+                    <div class="score-display" id="score-display">Score: 0</div>
+                </div>
+            </div>
+            <div class="canvas-container">
+                <canvas id="game-canvas" class="game-canvas" width="800" height="600"></canvas>
+            </div>
+            <div class="legend">
+                <span id="legend-label">P-wave arrival time analysis:</span>
+                <div class="legend-gradient">
+                    <span id="legend-fast">Rapid</span>
+                    <div class="gradient-bar"></div>
+                    <span id="legend-slow">Delayed</span>
+                </div>
+            </div>
+            <div class="tooltip" id="tooltip"></div>
+            <div class="results-panel" id="results-panel" style="display: none;">
+                <h3 id="results-title">Mission Analysis</h3>
+                <p id="results-text"></p>
+            </div>
+        </div>
+
+        <div id="final-screen" class="screen">
+            <div class="final-results">
+                <h1 id="final-title">Mission Complete!</h1>
+                <div class="final-score" id="final-score">0</div>
+                <div class="final-comment" id="final-comment"></div>
+                <button class="btn" id="play-again-btn">New Mission</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Game state and configuration
+        let gameState = {
+            language: 'en',
+            difficulty: 'easy',
+            round: 1,
+            totalScore: 0,
+            currentRoundScore: 0,
+            stations: [],
+            trueEpicenter: null,
+            userEstimate: null,
+            hintUsed: false,
+            mapData: null,
+            mapScale: 0.1, // km per pixel
+            animationId: null,
+            showTrueEpicenter: false,
+            timerId: null,
+            timeLeft: 60
+        };
+
+        const P_WAVE_VELOCITY = 6; // km/s
+        const MAP_WIDTH = 800;
+        const MAP_HEIGHT = 600;
+        const MIN_LAND_RATIO = 0.25; // Minimum 25% land area required
+
+        // Audio elements
+        const buttonClickSound = new Audio('button-click.mp3');
+        const mapPlaceSound = new Audio('map-place.mp3');
+        const hintSound = new Audio('deepsea-sonar-386156.mp3');
+        const successSound = new Audio('Clapping.mp3');
+        const failureSound = new Audio('Disappointing.mp3');
+        const bgMusic = new Audio('G.Army.mp3');
+        bgMusic.loop = true;
+        const roundMusic = new Audio('TimeUp.mp3');
+        roundMusic.loop = true;
+        let isAudioInitialized = false;
+
+        // Helper function to play sounds
+        function playSound(sound) {
+            if (!isAudioInitialized) return; // Don't play before user interaction
+            sound.currentTime = 0;
+            sound.play().catch(error => console.error(`Error playing ${sound.src}:`, error));
+        }
+
+        // Background Music Controls
+        function startBgMusic() {
+            if (isAudioInitialized && document.getElementById('intro-screen').classList.contains('active')) {
+                bgMusic.play().catch(e => console.error("Error playing BGM:", e));
+            }
+        }
+
+        function stopBgMusic() {
+            bgMusic.pause();
+            bgMusic.currentTime = 0;
+        }
+        
+        // Round Music Controls
+        function startRoundMusic() {
+            if (isAudioInitialized && document.getElementById('game-screen').classList.contains('active')) {
+                roundMusic.play().catch(e => console.error("Error playing round music:", e));
+            }
+        }
+
+        function stopRoundMusic() {
+            roundMusic.pause();
+            roundMusic.currentTime = 0;
+        }
+
+        // Initialize audio on the first user interaction to comply with autoplay policies
+        function initAudio() {
+            if (isAudioInitialized) return;
+            isAudioInitialized = true;
+            console.log("Audio Initialized.");
+            // Prime all audio elements by loading them
+            const allSounds = [buttonClickSound, mapPlaceSound, hintSound, successSound, failureSound, bgMusic, roundMusic];
+            allSounds.forEach(sound => sound.load());
+            startBgMusic(); // Attempt to start BGM now that audio is unlocked
+        }
+
+
+        // Translations
+        const translations = {
+            en: {
+                title: 'Epicenter-detection simulation game “EpiGuessr”',
+                introText: 'Welcome to the epicenter-determination simulation game “EpiGuessr”! Your mission is to estimate the epicenter of an earthquake using seismograph data. Analyze the P-wave arrival times at each observation station and place your estimate marker on the map by clicking. Stations with earlier P-wave arrivals are shown in reddish tones, while those with later arrivals are shown in bluish tones. If you’re unsure, try using the hint function. Complete all five rounds and aim for the highest score!',
+                difficultyLabel: 'Mission Difficulty',
+                languageLabel: 'Language',
+                startBtn: 'Start Game',
+                hintBtn: 'Hint (-30%)',
+                resultsBtn: 'View results',
+                legendLabel: 'P-wave arrival time:',
+                legendFast: 'Rapid',
+                legendSlow: 'Delayed',
+                resultsTitle: 'Mission Analysis',
+                finalTitle: 'Mission Complete!',
+                playAgainBtn: 'New Mission',
+                clickToEstimate: 'Deploy estimation marker on map',
+                stationTooltip: 'Station {0}: {1}s',
+                errorDistance: 'Error: {0} km',
+                roundScore: 'Mission Score: {0}',
+                excellent: 'Outstanding Performance!',
+                great: 'Excellent Work!',
+                notBad: 'Acceptable Results',
+                keepTrying: 'Requires Improvement',
+                timesUp: "Time's Up!"
+            },
+            ja: {
+                title: '震源決定シミュレーションゲーム「EpiGuessr」',
+                introText: '震源決定シミュレーションゲーム「EpiGuessr」へようこそ！あなたの任務は、地震計データをもとに地震の震央を推定することです。各観測点のP波到達時間を分析し、マップ上をクリックして推定地点にマーカーを置いてください。P波の到達が早い観測点は赤系の色で、遅い観測点は青系の色で表示されます。迷ったときはヒント機能を活用しましょう。全5ラウンドをクリアして、高スコアを目指してください！',
+                difficultyLabel: '難易度',
+                languageLabel: '使用言語',
+                startBtn: 'ゲーム開始',
+                hintBtn: 'ヒント機能 (-30%)',
+                resultsBtn: '結果をみる',
+                legendLabel: 'P波到達時間:',
+                legendFast: '早い',
+                legendSlow: '遅い',
+                resultsTitle: '結果発表',
+                finalTitle: 'ミッション完了！',
+                playAgainBtn: '新しいミッション',
+                clickToEstimate: 'マップをクリックして震央を決定しましょう',
+                stationTooltip: '観測点{0}: {1}秒',
+                errorDistance: '誤差: {0} km',
+                roundScore: 'ミッションスコア: {0}',
+                excellent: '素晴らしい！',
+                great: 'すごい！',
+                notBad: 'まずまずの結果です',
+                keepTrying: 'もっと頑張ろう',
+                timesUp: '時間切れ！'
+            }
+        };
+
+        function t(key, ...args) {
+            let text = translations[gameState.language][key] || key;
+            args.forEach((arg, index) => {
+                text = text.replace(`{${index}}`, arg);
+            });
+            return text;
+        }
+
+        function updateLanguage() {
+            document.getElementById('title').textContent = t('title');
+            document.getElementById('intro-text').textContent = t('introText');
+            document.getElementById('difficulty-label').textContent = t('difficultyLabel');
+            document.getElementById('language-label').textContent = t('languageLabel');
+            document.getElementById('start-btn').textContent = t('startBtn');
+            document.getElementById('hint-btn').textContent = t('hintBtn');
+            document.getElementById('results-btn').textContent = t('resultsBtn');
+            document.getElementById('legend-label').textContent = t('legendLabel');
+            document.getElementById('legend-fast').textContent = t('legendFast');
+            document.getElementById('legend-slow').textContent = t('legendSlow');
+            document.getElementById('results-title').textContent = t('resultsTitle');
+            document.getElementById('final-title').textContent = t('finalTitle');
+            document.getElementById('play-again-btn').textContent = t('playAgainBtn');
+        }
+
+        // Timer Functions
+        function startTimer() {
+            stopTimer(); // Ensure no previous timer is running
+            gameState.timeLeft = 60;
+            const timerDisplay = document.getElementById('timer-display');
+            timerDisplay.textContent = `Time: ${gameState.timeLeft}`;
+
+            gameState.timerId = setInterval(() => {
+                gameState.timeLeft--;
+                timerDisplay.textContent = `Time: ${gameState.timeLeft}`;
+                if (gameState.timeLeft <= 0) {
+                    handleTimeUp();
+                }
+            }, 1000);
+        }
+
+        function stopTimer() {
+            clearInterval(gameState.timerId);
+        }
+
+        function handleTimeUp() {
+            stopTimer();
+            // Disable interactions
+            document.getElementById('game-canvas').style.pointerEvents = 'none';
+            document.getElementById('hint-btn').disabled = true;
+            document.getElementById('results-btn').disabled = true;
+            
+            // Show results for timeout
+            showResults(true); 
+        }
+
+        // Diamond-Square Algorithm for map generation
+        function generateMap(size) {
+            const map = Array(size).fill().map(() => Array(size).fill(0));
+            const randomValue = () => (Math.random() - 0.5) * 2;
+
+            // Initialize corners
+            map[0][0] = randomValue();
+            map[0][size - 1] = randomValue();
+            map[size - 1][0] = randomValue();
+            map[size - 1][size - 1] = randomValue();
+
+            let stepSize = size - 1;
+            let scale = 1.0;
+
+            while (stepSize > 1) {
+                const halfStep = Math.floor(stepSize / 2);
+
+                // Diamond step
+                for (let y = halfStep; y < size; y += stepSize) {
+                    for (let x = halfStep; x < size; x += stepSize) {
+                        const avg = (
+                            map[y - halfStep][x - halfStep] +
+                            map[y - halfStep][x + halfStep] +
+                            map[y + halfStep][x - halfStep] +
+                            map[y + halfStep][x + halfStep]
+                        ) / 4;
+                        map[y][x] = avg + randomValue() * scale;
+                    }
+                }
+
+                // Square step
+                for (let y = 0; y < size; y += halfStep) {
+                    for (let x = (y + halfStep) % stepSize; x < size; x += stepSize) {
+                        const neighbors = [];
+                        if (y - halfStep >= 0) neighbors.push(map[y - halfStep][x]);
+                        if (y + halfStep < size) neighbors.push(map[y + halfStep][x]);
+                        if (x - halfStep >= 0) neighbors.push(map[y][x - halfStep]);
+                        if (x + halfStep < size) neighbors.push(map[y][x + halfStep]);
+
+                        const avg = neighbors.reduce((a, b) => a + b, 0) / neighbors.length;
+                        map[y][x] = avg + randomValue() * scale;
+                    }
+                }
+
+                stepSize = halfStep;
+                scale *= 0.5;
+            }
+
+            return map;
+        }
+
+        // Calculate land ratio of the generated map
+        function calculateLandRatio(mapData) {
+            let landPixels = 0;
+            let totalPixels = 0;
+
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    const mapX = Math.floor(x * mapData.length / MAP_WIDTH);
+                    const mapY = Math.floor(y * mapData.length / MAP_HEIGHT);
+                    if (mapData[mapY][mapX] > 0) {
+                        landPixels++;
+                    }
+                    totalPixels++;
+                }
+            }
+
+            return landPixels / totalPixels;
+        }
+
+        // Generate map with minimum land area validation
+        function generateValidMap(size) {
+            let mapData;
+            let landRatio;
+            let attempts = 0;
+            const maxAttempts = 50;
+
+            do {
+                mapData = generateMap(size);
+                landRatio = calculateLandRatio(mapData);
+                attempts++;
+            } while (landRatio < MIN_LAND_RATIO && attempts < maxAttempts);
+
+            // If we couldn't generate a valid map after max attempts, use the last one
+            return mapData;
+        }
+
+        function renderMap(canvas, mapData) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.createImageData(MAP_WIDTH, MAP_HEIGHT);
+            const data = imageData.data;
+
+            for (let y = 0; y < MAP_HEIGHT; y++) {
+                for (let x = 0; x < MAP_WIDTH; x++) {
+                    const mapX = Math.floor(x * mapData.length / MAP_WIDTH);
+                    const mapY = Math.floor(y * mapData.length / MAP_HEIGHT);
+                    const value = mapData[mapY][mapX];
+                    
+                    const pixelIndex = (y * MAP_WIDTH + x) * 4;
+                    
+                    if (value > 0) {
+                        // Land - green
+                        data[pixelIndex] = 34 + value * 50;     // R
+                        data[pixelIndex + 1] = 139 + value * 50; // G
+                        data[pixelIndex + 2] = 34 + value * 30;  // B
+                    } else {
+                        // Water - blue
+                        data[pixelIndex] = 30;                   // R
+                        data[pixelIndex + 1] = 100 - value * 50; // G
+                        data[pixelIndex + 2] = 200 - value * 30; // B
+                    }
+                    data[pixelIndex + 3] = 255; // A
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+
+        function isLand(x, y, mapData) {
+            const mapX = Math.floor(x * mapData.length / MAP_WIDTH);
+            const mapY = Math.floor(y * mapData.length / MAP_HEIGHT);
+            return mapData[mapY] && mapData[mapY][mapX] > 0;
+        }
+
+        function getStationCount() {
+            switch (gameState.difficulty) {
+                case 'easy': return 6;
+                case 'medium': return 4;
+                case 'hard': return 2;
+                default: return 4;
+            }
+        }
+
+        function placeStations(mapData) {
+            const stationCount = getStationCount();
+            const stations = [];
+            const minDistance = 80; // Minimum distance between stations
+
+            while (stations.length < stationCount) {
+                const x = Math.random() * MAP_WIDTH;
+                const y = Math.random() * MAP_HEIGHT;
+
+                if (isLand(x, y, mapData)) {
+                    // Check distance from other stations
+                    let tooClose = false;
+                    for (const station of stations) {
+                        const dist = Math.sqrt((x - station.x) ** 2 + (y - station.y) ** 2);
+                        if (dist < minDistance) {
+                            tooClose = true;
+                            break;
+                        }
+                    }
+
+                    if (!tooClose) {
+                        stations.push({ x, y, id: stations.length + 1 });
+                    }
+                }
+            }
+
+            return stations;
+        }
+
+        function generateTrueEpicenter(mapData) {
+            let x, y;
+            do {
+                x = Math.random() * MAP_WIDTH;
+                y = Math.random() * MAP_HEIGHT;
+            } while (!isLand(x, y, mapData));
+
+            return { x, y };
+        }
+
+        function calculateArrivalTimes(stations, epicenter) {
+            return stations.map(station => {
+                const distance = Math.sqrt(
+                    (station.x - epicenter.x) ** 2 + 
+                    (station.y - epicenter.y) ** 2
+                ) * gameState.mapScale;
+                
+                const arrivalTime = distance / P_WAVE_VELOCITY;
+                return { ...station, arrivalTime, distance };
+            });
+        }
+
+        function getStationColor(arrivalTime, minTime, maxTime) {
+            const ratio = (arrivalTime - minTime) / (maxTime - minTime);
+            const r = Math.floor(255 * (1 - ratio) + 68 * ratio);
+            const g = Math.floor(68 * (1 - ratio) + 68 * ratio);
+            const b = Math.floor(68 * (1 - ratio) + 255 * ratio);
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
+        function renderGame(canvas) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+            // Render map
+            renderMap(canvas, gameState.mapData);
+
+            // Find min/max arrival times for coloring
+            const arrivalTimes = gameState.stations.map(s => s.arrivalTime);
+            const minTime = Math.min(...arrivalTimes);
+            const maxTime = Math.max(...arrivalTimes);
+
+            // Render stations
+            gameState.stations.forEach(station => {
+                const color = getStationColor(station.arrivalTime, minTime, maxTime);
+                
+                ctx.fillStyle = color;
+                ctx.beginPath();
+                ctx.arc(station.x, station.y, 12, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // Station number
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(station.id.toString(), station.x, station.y + 4);
+            });
+
+            // Render user estimate
+            if (gameState.userEstimate) {
+                ctx.strokeStyle = 'red';
+                ctx.lineWidth = 3;
+                const size = 15;
+                ctx.beginPath();
+                ctx.moveTo(gameState.userEstimate.x - size, gameState.userEstimate.y - size);
+                ctx.lineTo(gameState.userEstimate.x + size, gameState.userEstimate.y + size);
+                ctx.moveTo(gameState.userEstimate.x + size, gameState.userEstimate.y - size);
+                ctx.lineTo(gameState.userEstimate.x - size, gameState.userEstimate.y + size);
+                ctx.stroke();
+            }
+
+            // Render true epicenter and connection line (only when explicitly shown)
+            if (gameState.trueEpicenter && gameState.showTrueEpicenter) {
+                // Connection line
+                if (gameState.userEstimate) {
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeStyle = 'yellow';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(gameState.userEstimate.x, gameState.userEstimate.y);
+                    ctx.lineTo(gameState.trueEpicenter.x, gameState.trueEpicenter.y);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                }
+
+                // True epicenter
+                ctx.fillStyle = 'gold';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(gameState.trueEpicenter.x, gameState.trueEpicenter.y, 8, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.stroke();
+            }
+        }
+
+        function animateHint(canvas) {
+            if (gameState.animationId) {
+                cancelAnimationFrame(gameState.animationId);
+            }
+
+            const ctx = canvas.getContext('2d');
+            const startTime = performance.now();
+            const duration = 10000; // 10 seconds
+
+            // Find maximum arrival time
+            const maxArrivalTime = Math.max(...gameState.stations.map(s => s.arrivalTime));
+
+            function animate() {
+                const elapsedTime = (performance.now() - startTime) / 1000;
+                
+                if (elapsedTime < duration) {
+                    // Clear only the animation layer
+                    renderGame(canvas);
+
+                    gameState.stations.forEach(station => {
+                        const delayTime = maxArrivalTime - station.arrivalTime;
+                        const adjustedTime = elapsedTime - delayTime;
+
+                        if (adjustedTime > 0) {
+                            const radius = (P_WAVE_VELOCITY * adjustedTime) / gameState.mapScale;
+                            const alpha = Math.max(0, 1 - adjustedTime / 8);
+
+                            ctx.strokeStyle = `rgba(255, 255, 0, ${alpha * 0.6})`;
+                            ctx.lineWidth = 2;
+                            ctx.beginPath();
+                            ctx.arc(station.x, station.y, radius, 0, 2 * Math.PI);
+                            ctx.stroke();
+                        }
+                    });
+
+                    gameState.animationId = requestAnimationFrame(animate);
+                }
+            }
+
+            animate();
+        }
+
+        function calculateScore(errorDistance, hintUsed) {
+            let baseScore = Math.max(0, 1000 - errorDistance * 10);
+            if (hintUsed) baseScore *= 0.7; // 30% penalty
+            return Math.round(baseScore);
+        }
+
+        function generateNewRound() {
+            // Generate new map for each round
+            const mapSize = 129;
+            gameState.mapData = generateValidMap(mapSize);
+            
+            // Calculate map scale (max travel time 20s)
+            gameState.mapScale = (20 * P_WAVE_VELOCITY) / Math.sqrt(MAP_WIDTH * MAP_WIDTH + MAP_HEIGHT * MAP_HEIGHT);
+
+            // Generate new epicenter and stations
+            gameState.trueEpicenter = generateTrueEpicenter(gameState.mapData);
+            gameState.stations = placeStations(gameState.mapData);
+            gameState.stations = calculateArrivalTimes(gameState.stations, gameState.trueEpicenter);
+
+            // Reset round-specific state
+            gameState.userEstimate = null;
+            gameState.hintUsed = false;
+            gameState.showTrueEpicenter = false;
+        }
+
+        
+        function showResults(timeUp = false) {
+            stopTimer();
+            stopRoundMusic();
+            
+            let errorDistance = Infinity;
+            let roundScore = 0;
+            const resultsPanel = document.getElementById('results-panel');
+
+            if (!timeUp) {
+                if (!gameState.userEstimate) return; // Should not happen if button is clicked
+                errorDistance = Math.sqrt(
+                    (gameState.userEstimate.x - gameState.trueEpicenter.x) ** 2 + 
+                    (gameState.userEstimate.y - gameState.trueEpicenter.y) ** 2
+                ) * gameState.mapScale;
+                roundScore = calculateScore(errorDistance, gameState.hintUsed);
+            }
+
+            gameState.currentRoundScore = roundScore;
+            gameState.totalScore += roundScore;
+
+            gameState.showTrueEpicenter = true;
+            resultsPanel.classList.remove('correct', 'incorrect');
+
+            if (timeUp || errorDistance > 50) {
+                 resultsPanel.classList.add('incorrect');
+            } else {
+                resultsPanel.classList.add('correct');
+            }
+
+            document.getElementById('results-text').innerHTML = timeUp ?
+                `${t('timesUp')}<br>${t('roundScore', 0)}` :
+                `${t('errorDistance', errorDistance.toFixed(1))}<br>${t('roundScore', roundScore)}`;
+            
+            resultsPanel.style.display = 'block';
+            document.getElementById('score-display').textContent = `Score: ${gameState.totalScore}`;
+
+            renderGame(document.getElementById('game-canvas'));
+
+            setTimeout(() => {
+                if (gameState.round < 5) {
+                    nextRound();
+                } else {
+                    showFinalResults();
+                }
+            }, 3000);
+        }
+
+        function nextRound() {
+            gameState.round++;
+            
+            if (gameState.animationId) {
+                cancelAnimationFrame(gameState.animationId);
+            }
+
+            generateNewRound();
+
+            document.getElementById('round-display').textContent = `Mission ${gameState.round}/5`;
+            document.getElementById('results-panel').style.display = 'none';
+            document.getElementById('results-btn').disabled = true;
+            document.getElementById('hint-btn').disabled = false;
+            document.getElementById('game-canvas').style.pointerEvents = 'auto'; // Re-enable clicking
+
+            renderGame(document.getElementById('game-canvas'));
+            startTimer();
+            startRoundMusic();
+        }
+
+        function showFinalResults() {
+            stopTimer();
+            stopRoundMusic();
+            const finalScore = gameState.totalScore;
+            let comment;
+
+            if (finalScore >= 3000) {
+                playSound(successSound);
+            } else {
+                playSound(failureSound);
+            }
+
+            if (finalScore >= 4000) {
+                comment = t('excellent');
+            } else if (finalScore >= 3000) {
+                comment = t('great');
+            } else if (finalScore >= 2000) {
+                comment = t('notBad');
+            } else {
+                comment = t('keepTrying');
+            }
+
+            document.getElementById('final-score').textContent = finalScore;
+            document.getElementById('final-comment').textContent = comment;
+
+            showScreen('final-screen');
+
+            if (finalScore >= 3500) {
+                const launchGeminiConfetti = () => {
+                    const canvas = document.getElementById('confetti-canvas');
+                    if (!canvas) return;
+
+                    const myConfetti = confetti.create(canvas, { resize: true, useWorker: true });
+                    const colors = ['#1e3a8a', '#ea580c', '#fbbf24', '#ffffff'];
+
+                    myConfetti({ particleCount: 200, spread: 80, origin: { y: 0.6 }, colors: colors });
+                    
+                    const launchFountain = (originX) => myConfetti({ particleCount: 40, angle: originX < 0.5 ? 60 : 120, spread: 55, origin: { x: originX, y: 1 }, colors: colors, shapes: ['star'], scalar: 1.2 });
+                    setTimeout(() => launchFountain(0.1), 150);
+                    setTimeout(() => launchFountain(0.9), 150);
+                };
+                requestAnimationFrame(launchGeminiConfetti);
+            }
+        }
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => screen.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function startGame() {
+            stopBgMusic();
+            playSound(buttonClickSound);
+            gameState.language = document.getElementById('language-select').value;
+            gameState.difficulty = document.getElementById('difficulty-select').value;
+            
+            updateLanguage();
+
+            gameState.round = 1;
+            gameState.totalScore = 0;
+            gameState.currentRoundScore = 0;
+
+            generateNewRound();
+
+            document.getElementById('round-display').textContent = `Mission 1/5`;
+            document.getElementById('score-display').textContent = `Score: 0`;
+            document.getElementById('results-btn').disabled = true;
+            document.getElementById('hint-btn').disabled = false;
+            document.getElementById('results-panel').style.display = 'none';
+
+            const canvas = document.getElementById('game-canvas');
+            canvas.style.pointerEvents = 'auto';
+            renderGame(canvas);
+
+            showScreen('game-screen');
+            startTimer();
+            startRoundMusic();
+        }
+
+        function resetGame() {
+            playSound(buttonClickSound);
+            stopTimer();
+            stopRoundMusic();
+            if (gameState.animationId) cancelAnimationFrame(gameState.animationId);
+
+            gameState = { ...gameState, round: 1, totalScore: 0, currentRoundScore: 0, timerId: null, timeLeft: 60 };
+
+            document.getElementById('results-panel').style.display = 'none';
+            document.getElementById('round-display').textContent = 'Mission 1/5';
+            document.getElementById('score-display').textContent = 'Score: 0';
+            
+            const canvas = document.getElementById('game-canvas');
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+            updateLanguage();
+            showScreen('intro-screen');
+            startBgMusic();
+        }
+
+        // Event listeners
+        document.body.addEventListener('click', initAudio, { once: true });
+        document.body.addEventListener('keydown', initAudio, { once: true });
+
+        document.getElementById('language-select').addEventListener('change', function() {
+            gameState.language = this.value;
+            updateLanguage();
+        });
+
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('play-again-btn').addEventListener('click', resetGame);
+
+        document.getElementById('hint-btn').addEventListener('click', function() {
+            playSound(buttonClickSound);
+            if (!gameState.hintUsed) {
+                playSound(hintSound);
+                gameState.hintUsed = true;
+                this.disabled = true;
+                animateHint(document.getElementById('game-canvas'));
+            }
+        });
+
+        document.getElementById('results-btn').addEventListener('click', () => {
+            playSound(buttonClickSound);
+            showResults(false)
+        });
+
+        // Canvas click handler
+        document.getElementById('game-canvas').addEventListener('click', function(e) {
+            if (gameState.userEstimate) return; // Already placed estimate
+            playSound(mapPlaceSound);
+
+            const rect = this.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+
+            gameState.userEstimate = { x, y };
+            document.getElementById('results-btn').disabled = false;
+            
+            renderGame(this);
+        });
+
+        // Tooltip functionality
+        const tooltip = document.getElementById('tooltip');
+        const canvas = document.getElementById('game-canvas');
+        const container = document.querySelector('.container');
+
+        canvas.addEventListener('mousemove', function(e) {
+            const canvasRect = this.getBoundingClientRect();
+            const x = e.clientX - canvasRect.left;
+            const y = e.clientY - canvasRect.top;
+
+            let showTooltip = false;
+            
+            for (const station of gameState.stations) {
+                const distance = Math.sqrt((x - station.x) ** 2 + (y - station.y) ** 2);
+                if (distance <= 15) {
+                    const containerRect = container.getBoundingClientRect();
+                    const mouseXInContainer = e.clientX - containerRect.left;
+                    const mouseYInContainer = (e.clientY - containerRect.top) + container.scrollTop;
+                    
+                    tooltip.textContent = t('stationTooltip', station.id, station.arrivalTime.toFixed(1));
+                    tooltip.style.display = 'block';
+
+                    const tooltipWidth = tooltip.offsetWidth;
+                    const containerWidth = container.clientWidth;
+                    const offset = 15;
+                    
+                    let tooltipX = (mouseXInContainer + offset + tooltipWidth > containerWidth) ? 
+                        mouseXInContainer - tooltipWidth - offset : 
+                        mouseXInContainer + offset;
+
+                    tooltip.style.left = tooltipX + 'px';
+                    tooltip.style.top = (mouseYInContainer - 15) + 'px';
+
+                    showTooltip = true;
+                    break;
+                }
+            }
+
+            if (!showTooltip) {
+                tooltip.style.display = 'none';
+            }
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+            tooltip.style.display = 'none';
+        });
+
+        // Initialize
+        updateLanguage();
+        // The initAudio function triggered by user interaction will handle starting the BGM
+    </script>
+</body>
+</html>
+
