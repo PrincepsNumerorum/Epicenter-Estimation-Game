@@ -1192,6 +1192,7 @@
 
         
         function showResults(timeUp = false) {
+            document.getElementById('results-btn').disabled = true;
             stopTimer();
             stopRoundMusic();
             
@@ -1387,7 +1388,6 @@
 
         // Canvas click handler
         document.getElementById('game-canvas').addEventListener('click', function(e) {
-            if (gameState.userEstimate) return; // Already placed estimate
             playSound(mapPlaceSound);
 
             const rect = this.getBoundingClientRect();
